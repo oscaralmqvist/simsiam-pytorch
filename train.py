@@ -4,6 +4,8 @@ import torchvision.transforms as transforms
 
 import torch.optim as optim
 
+import torch.nn.functional as F
+
 from simsiam import SimSiam
 
 def get_augmentations(imgsize=64, crop=True, flip=True, jitter=True, grayscale=True, blur=True):
@@ -25,19 +27,59 @@ def get_augmentations(imgsize=64, crop=True, flip=True, jitter=True, grayscale=T
 
   return transforms.Compose(augs)
 
+def validate(model, trainloader, validationloader):
+  print('KNN')
+  model.eval()
+  xtrain = []
+  ytrain = []
+  with torch.no_grad():
+    for i, batch in enumerate(trainloader):
+      x, y = batch
+      xtrain.append(F.normalize(model(x, x)[1], dim=1))
+      ytrain.append(y)
+      if i % 200 == 0:
+        print(i)
+
+    xtrain = torch.cat(xtrain, dim=0)
+    ytrain = torch.cat(ytrain, dim=0)
+
+    correct = 0
+    total = 0
+
+    for i, batch in enumerate(validationloader):
+      x, y = batch
+      z = F.normalize(model(x, x)[1], dim=1)
+
+      if i % 50 == 0:
+        print(i)
+
+      dist = torch.cdist(xtrain, z, p=2)
+      knn_pred = ytrain[dist.topk(1, largest=False, dim=0).indices].T[0]
+      correct += torch.sum(knn_pred == y).item()
+      total += x.shape[0]
+
+  print('1NN accuracy: {}'.format(correct/total))
+
+  model.train()
+
 def main(datasetname):
   augmentations = get_augmentations()
   transform = transforms.ToTensor()
   if datasetname == 'CIFAR10':
+    batch_size = 64
     trainset = torchvision.datasets.CIFAR10(
                                         root='./data/CIFAR10/',
                                         train=True,
                                         download=True,
                                         transform=transform)
+    validationset = torchvision.datasets.CIFAR10(
+                                        root='./data/CIFAR10/',
+                                        train=False,
+                                        download=True,
+                                        transform=transform)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=4)
 
-  batch_size = 64
-  trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=4)
-
+    validationloader = torch.utils.data.DataLoader(validationset, batch_size=batch_size, shuffle=True, num_workers=4)
 
   model = SimSiam()
   # TODO Add LR scheduler
@@ -64,9 +106,10 @@ def main(datasetname):
       lossval = loss.item()
       smooth_loss = smooth_loss*0.99 + lossval*0.01
 
-      if i % 10 == 0:
+      if i % 100 == 0:
         print('ITER: {}, loss: {}, smooth_loss: {}'.format(n_iter, lossval, smooth_loss))
 
+    validate(model, trainloader, validationloader)
 
 if __name__ == '__main__':
   main('CIFAR10')
