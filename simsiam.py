@@ -2,8 +2,10 @@ import torch
 from torch import nn
 import torchvision.models as models
 
+import torch.nn.functional as F
+
 class SimSiam(nn.Module):
-  def __init__(self, d=1024):
+  def __init__(self, d=2048):
     super().__init__()
     self.encoder = models.resnet18() # TODO Add option for ResNet-50
     enc_size = self.encoder.fc.out_features
@@ -39,7 +41,7 @@ class SimSiam(nn.Module):
   def D(self, p, z):
     z = z.detach()
 
-    p = torch.norm(p, dim=1)
-    z = torch.norm(z, dim=1)
+    p = F.normalize(p, dim=1)
+    z = F.normalize(z, dim=1)
 
-    return -(p*z).sum().mean()
+    return -(p*z).sum(dim=1).mean()
