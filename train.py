@@ -35,10 +35,8 @@ def validate(model, trainloader, validationloader):
   with torch.no_grad():
     for i, batch in enumerate(trainloader):
       x, y = batch
-      xtrain.append(F.normalize(model(x, x)[1], dim=1))
+      xtrain.append(F.normalize(model(x, x)[2], dim=1))
       ytrain.append(y)
-      if i % 200 == 0:
-        print(i)
 
     xtrain = torch.cat(xtrain, dim=0)
     ytrain = torch.cat(ytrain, dim=0)
@@ -48,13 +46,10 @@ def validate(model, trainloader, validationloader):
 
     for i, batch in enumerate(validationloader):
       x, y = batch
-      z = F.normalize(model(x, x)[1], dim=1)
-
-      if i % 50 == 0:
-        print(i)
+      z = F.normalize(model(x, x)[2], dim=1)
 
       dist = torch.cdist(xtrain, z, p=2)
-      knn_pred = ytrain[dist.topk(1, largest=False, dim=0).indices].T[0]
+      knn_pred = ytrain[dist.topk(1, largest=False, dim=0).indices][0]
       correct += torch.sum(knn_pred == y).item()
       total += x.shape[0]
 
@@ -106,7 +101,7 @@ def main(datasetname):
       lossval = loss.item()
       smooth_loss = smooth_loss*0.99 + lossval*0.01
 
-      if i % 100 == 0:
+      if i % 100 == 0 and i != 0:
         print('ITER: {}, loss: {}, smooth_loss: {}'.format(n_iter, lossval, smooth_loss))
 
     validate(model, trainloader, validationloader)
