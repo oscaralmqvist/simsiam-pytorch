@@ -1,6 +1,7 @@
 import torch
 import torchvision
 import torchvision.transforms as transforms
+import torchvision.models as models
 
 import torch.optim as optim
 
@@ -35,6 +36,10 @@ def validate(model, trainloader, validationloader):
   with torch.no_grad():
     for i, batch in enumerate(trainloader):
       x, y = batch
+
+      if torch.cuda.is_available():
+        x, y = x.to('cuda'), y.to('cuda')
+
       xtrain.append(F.normalize(model(x, x)[2], dim=1))
       ytrain.append(y)
 
@@ -46,6 +51,10 @@ def validate(model, trainloader, validationloader):
 
     for i, batch in enumerate(validationloader):
       x, y = batch
+
+      if torch.cuda.is_available():
+        x, y = x.to('cuda'), y.to('cuda')
+
       z = F.normalize(model(x, x)[2], dim=1)
 
       dist = torch.cdist(xtrain, z, p=2)
@@ -58,34 +67,51 @@ def validate(model, trainloader, validationloader):
   model.train()
 
 def main(datasetname):
-  augmentations = get_augmentations()
-  transform = transforms.ToTensor()
+  print("using cuda?",torch.cuda.is_available())
+
   if datasetname == 'CIFAR10':
-    batch_size = 64
-    trainset = torchvision.datasets.CIFAR10(
-                                        root='./data/CIFAR10/',
-                                        train=True,
-                                        download=True,
-                                        transform=transform)
-    validationset = torchvision.datasets.CIFAR10(
-                                        root='./data/CIFAR10/',
-                                        train=False,
-                                        download=True,
-                                        transform=transform)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=4)
+    model = SimSiam(encoder=models.resnet18)
 
-    validationloader = torch.utils.data.DataLoader(validationset, batch_size=batch_size, shuffle=True, num_workers=4)
+    # As described in the paper, blur wasn't used for CIFAR10 experiments
+    augmentations = get_augmentations(blur=False) 
+    transform = transforms.ToTensor() 
 
-  model = SimSiam()
+    dataset_config = {
+      'root': './data/CIFAR10/',
+      'download': True,
+      'transform': transform
+    }
+
+    dataloader_config = {
+      'batch_size': 512,
+      'shuffle': True,
+      'num_workers': 4,
+      'pin_memory': torch.cuda.is_available()
+    }
+
+    trainset = torchvision.datasets.CIFAR10(train=True, **dataset_config)
+    validationset = torchvision.datasets.CIFAR10(train=False, **dataset_config)
+
+    trainloader = torch.utils.data.DataLoader(trainset, **dataloader_config)
+    validationloader = torch.utils.data.DataLoader(validationset, **dataloader_config)
+  
+  if torch.cuda.is_available():
+    model = model.to('cuda')
+
   # TODO Add LR scheduler
   optimizer = optim.SGD(model.parameters(), lr=0.05, momentum=0.9, weight_decay=0.0001)
 
   smooth_loss = 0.0
   n_iter = 0
   for epoch in range(100):
+    print("epoch =", epoch)
     for i, batch in enumerate(trainloader, 0):
-      x, y = batch
-      n_iter += batch_size
+      x, _ = batch
+      
+      if torch.cuda.is_available():
+        x = x.to('cuda')
+
+      n_iter += dataloader_config['batch_size']
 
       x1 = augmentations(x)
       x2 = augmentations(x)
