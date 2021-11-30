@@ -105,7 +105,7 @@ def main(datasetname):
   smooth_loss = 0.0
   n_iter = 0
   for epoch in range(n_epochs):
-    print("epoch =", epoch)
+    print(f"epoch = {epoch}, smooth loss = {smooth_loss}")
     for i, batch in enumerate(trainloader, 0):
       x, _ = batch
       
