@@ -1,13 +1,12 @@
-import torch
 from torch import nn
 import torchvision.models as models
 
 import torch.nn.functional as F
 
 class SimSiam(nn.Module):
-  def __init__(self, d=2048):
+  def __init__(self, d=2048, encoder=models.resnet50):
     super().__init__()
-    self.encoder = models.resnet18() # TODO Add option for ResNet-50
+    self.encoder = encoder()
     enc_size = self.encoder.fc.out_features
 
     self.projection = nn.Sequential(
