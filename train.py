@@ -70,6 +70,7 @@ def main(datasetname):
   print("using cuda?",torch.cuda.is_available())
 
   if datasetname == 'CIFAR10':
+    n_epochs = 800
     model = SimSiam(encoder=models.resnet18)
 
     # As described in the paper, blur wasn't used for CIFAR10 experiments
@@ -94,16 +95,16 @@ def main(datasetname):
 
     trainloader = torch.utils.data.DataLoader(trainset, **dataloader_config)
     validationloader = torch.utils.data.DataLoader(validationset, **dataloader_config)
-  
+
+    optimizer = optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=0.0005)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_epochs) 
+
   if torch.cuda.is_available():
     model = model.to('cuda')
 
-  # TODO Add LR scheduler
-  optimizer = optim.SGD(model.parameters(), lr=0.05, momentum=0.9, weight_decay=0.0001)
-
   smooth_loss = 0.0
   n_iter = 0
-  for epoch in range(100):
+  for epoch in range(n_epochs):
     print("epoch =", epoch)
     for i, batch in enumerate(trainloader, 0):
       x, _ = batch
@@ -130,6 +131,7 @@ def main(datasetname):
       if i % 100 == 0 and i != 0:
         print('ITER: {}, loss: {}, smooth_loss: {}'.format(n_iter, lossval, smooth_loss))
 
+    scheduler.step()
     validate(model, trainloader, validationloader)
 
 if __name__ == '__main__':
