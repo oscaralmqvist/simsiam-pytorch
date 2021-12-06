@@ -101,13 +101,13 @@ def voc_collate_fn(batch):
     objects = targets['annotation']['object']
 
     d = {}
-    d['boxes'] = []
-    d['labels'] = []
+    d['boxes'] = torch.zeros((len(objects), 4))
+    d['labels'] = torch.ones((1))
 
-    for obj in objects:
+    for i, obj in enumerate(objects):
       x1, y1, x2, y2 = obj['bndbox']['xmin'], obj['bndbox']['ymin'], obj['bndbox']['xmax'], obj['bndbox']['ymax']   
-      d['boxes'].append([int(x1), int(y1), int(x2), int(y2)])
-      d['labels'].append(1)
+      d['boxes'][i] = torch.FloatTensor([int(x1), int(y1), int(x2), int(y2)])
+      #d['labels'][i] = ??
     
     y.append(d)
 
