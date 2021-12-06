@@ -4,9 +4,9 @@ import torchvision.models as models
 import torch.nn.functional as F
 
 class SimSiam(nn.Module):
-  def __init__(self, d=2048, encoder=models.resnet50):
+  def __init__(self, d=2048, encoder=models.resnet50, pretrained=False):
     super().__init__()
-    self.encoder = encoder()
+    self.encoder = encoder(pretrained)
     enc_size = self.encoder.fc.out_features
 
     self.projection = nn.Sequential(
@@ -27,6 +27,7 @@ class SimSiam(nn.Module):
                           nn.ReLU(),
                           nn.Linear(512, d)
                           )
+    self.out_channels = d
 
   def forward(self, x1, x2):
     z1 = self.projection(x1)

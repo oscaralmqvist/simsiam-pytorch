@@ -8,8 +8,9 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 from simsiam import SimSiam
+from torchvision.models.detection import FasterRCNN
 
-import wandb
+#import wandb
 
 import argparse
 import datetime
@@ -90,13 +91,34 @@ def get_weight_decay(optimizer):
   for p in optimizer.param_groups:
     return p['weight_decay']
 
+def voc_collate_fn(batch):
+  y = [] 
+
+  for i in range(len(batch)):
+    # batch size == 1 as the images can be of different sizes
+    image, targets = batch[i]
+
+    objects = targets['annotation']['object']
+
+    d = {}
+    d['boxes'] = []
+    d['labels'] = []
+
+    for obj in objects:
+      x1, y1, x2, y2 = obj['bndbox']['xmin'], obj['bndbox']['ymin'], obj['bndbox']['xmax'], obj['bndbox']['ymax']   
+      d['boxes'].append([int(x1), int(y1), int(x2), int(y2)])
+      d['labels'].append(1)
+    
+    y.append(d)
+
+  return image.unsqueeze(0), y
+
 
 def main(datasetname, runname):
   print("using cuda?",torch.cuda.is_available())
   n_epochs = 100
 
   augs_text = ''
-  batch_size = 512
   if datasetname == 'CIFAR10':
     n_epochs = 100
     model = SimSiam(encoder=models.resnet18)
@@ -112,7 +134,7 @@ def main(datasetname, runname):
     }
 
     dataloader_config = {
-      'batch_size': batch_size,
+      'batch_size': 512,
       'shuffle': True,
       'num_workers': 4,
       'pin_memory': torch.cuda.is_available()
@@ -127,6 +149,38 @@ def main(datasetname, runname):
     optimizer = optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=0.0005)
     #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_epochs)
 
+  if datasetname == "VOC07":
+    n_epochs = 0
+    model = SimSiam(encoder=models.resnet50, pretrained=True)
+
+    augmentations, augs_text = get_augmentations()
+    transform = transforms.ToTensor() 
+
+    dataset_config = {
+      'root': './data/VOC07/',
+      'download': True,
+      'year': '2007',
+      'transform': transforms.Compose([transforms.Resize((10, 10)), transforms.ToTensor()])
+    }
+
+    dataloader_config = {
+      'batch_size': 1,
+      'shuffle': True,
+      'num_workers': 4,
+      'pin_memory': torch.cuda.is_available(),
+      'collate_fn': voc_collate_fn
+    }
+
+    #trainset = torchvision.datasets.CIFAR10(root='./data/CIFAR10/', download=True, transform=transform)
+    tl_trainset = torchvision.datasets.VOCDetection(image_set='val', **dataset_config)
+    #tl_validationset = torchvision.datasets.VOCDetection(image_set='val', **dataset_config)
+
+    #trainloader = torch.utils.data.DataLoader(trainset, **dataloader_config)
+    tl_trainloader = torch.utils.data.DataLoader(tl_trainset, **dataloader_config)
+    #tl_validationloader = torch.utils.data.DataLoader(tl_validationset, **dataloader_config)
+
+    optimizer = optim.SGD(model.parameters(), lr=0.05, momentum=0.9, weight_decay=0.0001)
+
   if torch.cuda.is_available():
     model = model.to('cuda')
 
@@ -140,9 +194,9 @@ def main(datasetname, runname):
     'batch_size': dataloader_config['batch_size'],
     'augmentations': augs_text
   }
-  wandb.init(project='simsiam', entity='simsiambois', save_code=True, group='simsiambois', tags=datasetname, name=runname, config=config)
+  #wandb.init(project='simsiam', entity='simsiambois', save_code=True, group='simsiambois', tags=datasetname, name=runname, config=config)
 
-  wandb.watch(model)
+  #wandb.watch(model)
 
   smooth_loss = 0.0
   n_iter = 0
@@ -170,15 +224,35 @@ def main(datasetname, runname):
       lossval = loss.item()
       smooth_loss = smooth_loss*0.99 + lossval*0.01
 
-      wandb.log({'n_iter': n_iter, 'epoch': epoch, 'loss': lossval})
+      #wandb.log({'n_iter': n_iter, 'epoch': epoch, 'loss': lossval})
 
       if i % 100 == 0 and i != 0:
         print('ITER: {}, loss: {}, smooth_loss: {}'.format(n_iter, lossval, smooth_loss))
 
     if datasetname == 'CIFAR10':
       knn_acc = knn_validate(model, trainloader, validationloader)
-      wandb.log({'n_iter': n_iter, 'epoch': epoch, '1nn_accuracy': knn_acc})
+      #wandb.log({'n_iter': n_iter, 'epoch': epoch, '1nn_accuracy': knn_acc})
+  
+  if datasetname == "VOC07":
+    print('transfer learning on VOC07 detection')
+    tl_model = FasterRCNN(backbone=model, num_classes=21)
+    tl_model = tl_model.to('cuda')
+    model.eval()
+
+    for epoch in range(1):
+      print(tl_trainloader)
+      for i, batch in enumerate(tl_trainloader, 0):
+        x, y = batch
+
+        x = x.to('cuda')
+
+        print(x.size())
+        print(y)
+
+        x = model.forward(x, x)
+        tl_model.forward(x, y)
+        exit()
 
 if __name__ == '__main__':
   # TODO Maybe add argparse stuff here
-  main('CIFAR10', 'CIFAR10-testrun')
+  main('VOC07', 'VOC07-debug')
