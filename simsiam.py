@@ -9,6 +9,9 @@ class SimSiam(nn.Module):
     self.encoder = encoder()
     enc_size = self.encoder.fc.out_features
 
+    enc_modules = list(self.encoder.children())[:-1]
+    self.embeddings = nn.Sequential(*enc_modules)
+
     self.projection = nn.Sequential(
                           self.encoder,
                           nn.Linear(enc_size, 2048),
@@ -27,6 +30,9 @@ class SimSiam(nn.Module):
                           nn.ReLU(),
                           nn.Linear(512, d)
                           )
+
+  def get_embedding(self, x):
+    return self.embeddings(x).squeeze()
 
   def forward(self, x1, x2):
     z1 = self.projection(x1)
