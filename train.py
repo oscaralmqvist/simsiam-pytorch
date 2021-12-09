@@ -70,7 +70,7 @@ def knn_validate(model, trainloader, validationloader, k=200):
       #dist = torch.cdist(xtrain, z, p=2)
       #dist = torch.norm(xtrain-z, p=2)
       thing = torch.matmul(xtrain, z.T)/0.2
-      dist = F.softmax(thing, dim=1)
+      dist = F.log_softmax(thing, dim=0)
       #knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=False, dim=0).indices], dim=0)
       knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=True, dim=0).indices], dim=0)
       #knn_pred = ytrain[dist.topk(k, largest=False, dim=0).indices][0]
