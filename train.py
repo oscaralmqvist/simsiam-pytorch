@@ -66,8 +66,14 @@ def knn_validate(model, trainloader, validationloader, k=200):
         x, y = x.to('cuda'), y.to('cuda')
 
       z = F.normalize(model.get_embedding(x), dim=1)
-      dist = torch.cdist(xtrain, z, p=2)
-      knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=False, dim=0).indices], dim=0)
+
+      #dist = torch.cdist(xtrain, z, p=2)
+      #dist = torch.norm(xtrain-z, p=2)
+      thing = torch.matmul(xtrain, z.T)/0.2
+      dist = F.softmax(thing, dim=1)
+      #knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=False, dim=0).indices], dim=0)
+      knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=True, dim=0).indices], dim=0)
+      #knn_pred = ytrain[dist.topk(k, largest=False, dim=0).indices][0]
       correct += torch.sum(knn_pred == y).item()
       total += x.shape[0]
 
