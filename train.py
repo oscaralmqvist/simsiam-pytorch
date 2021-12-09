@@ -62,8 +62,10 @@ def knn_validate(model, trainloader, validationloader, k=200):
     for i, batch in enumerate(validationloader):
       x, y = batch
 
+      votes = torch.zeros(x.shape[0], 10) # TODO Fix to be th number of classes instead of 10
       if torch.cuda.is_available():
         x, y = x.to('cuda'), y.to('cuda')
+        votes = votes.to('cuda')
 
       z = F.normalize(model.get_embedding(x), dim=1)
 
@@ -73,7 +75,6 @@ def knn_validate(model, trainloader, validationloader, k=200):
       thing = torch.matmul(xtrain, z.T)
       #dist = F.log_softmax(thing, dim=0)
 
-      votes = torch.zeros(x.shape[0], 10) # TODO Fix to be th number of classes instead of 10
       #knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=False, dim=0).indices], dim=0)
       val, ind = thing.topk(k, largest=True, dim=0)
       for u in range(k):
