@@ -69,10 +69,18 @@ def knn_validate(model, trainloader, validationloader, k=200):
 
       #dist = torch.cdist(xtrain, z, p=2)
       #dist = torch.norm(xtrain-z, p=2)
-      thing = torch.matmul(xtrain, z.T)/0.2
-      dist = F.log_softmax(thing, dim=0)
+      #thing = torch.matmul(xtrain, z.T)/0.2
+      thing = torch.matmul(xtrain, z.T)
+      #dist = F.log_softmax(thing, dim=0)
+
+      votes = torch.zeros(x.shape[0], 10) # TODO Fix to be th number of classes instead of 10
       #knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=False, dim=0).indices], dim=0)
-      knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=True, dim=0).indices], dim=0)
+      val, ind = thing.topk(k, largest=True, dim=0)
+      for u in range(k):
+        votes[:,ytrain[ind[u]]] += torch.exp(thing[ind[u]]/0.2)
+      knn_pred = torch.argmax(votes, dim=1)
+
+      #knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=True, dim=0).indices], dim=0)
       #knn_pred = ytrain[dist.topk(k, largest=False, dim=0).indices][0]
       correct += torch.sum(knn_pred == y).item()
       total += x.shape[0]
