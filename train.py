@@ -97,11 +97,11 @@ def main(datasetname, runname):
   augs_text = ''
   batch_size = 512
   if datasetname == 'CIFAR10':
-    n_epochs = 100
+    n_epochs = 800
     model = SimSiam(encoder=models.resnet18)
 
     # As described in the paper, blur wasn't used for CIFAR10 experiments
-    augmentations, augs_text = get_augmentations(blur=False)
+    augmentations, augs_text = get_augmentations(imgsize=32, blur=False)
     transform = transforms.ToTensor() 
 
     dataset_config = {
