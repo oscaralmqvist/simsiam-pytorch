@@ -38,7 +38,7 @@ def get_augmentations(imgsize=64, crop=True, flip=True, jitter=True, grayscale=T
 
   return transforms.Compose(augs), augs_text
 
-def knn_validate(model, trainloader, validationloader):
+def knn_validate(model, trainloader, validationloader, k=200):
   print('KNN')
   model.eval()
   xtrain = []
@@ -50,7 +50,7 @@ def knn_validate(model, trainloader, validationloader):
       if torch.cuda.is_available():
         x, y = x.to('cuda'), y.to('cuda')
 
-      xtrain.append(F.normalize(model(x, x)[2], dim=1))
+      xtrain.append(F.normalize(model.get_embedding(x), dim=1))
       ytrain.append(y)
 
     xtrain = torch.cat(xtrain, dim=0)
@@ -65,10 +65,9 @@ def knn_validate(model, trainloader, validationloader):
       if torch.cuda.is_available():
         x, y = x.to('cuda'), y.to('cuda')
 
-      z = F.normalize(model(x, x)[2], dim=1)
-
+      z = F.normalize(model.get_embedding(x), dim=1)
       dist = torch.cdist(xtrain, z, p=2)
-      knn_pred = ytrain[dist.topk(1, largest=False, dim=0).indices][0]
+      knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=False, dim=0).indices], dim=0)
       correct += torch.sum(knn_pred == y).item()
       total += x.shape[0]
 
