@@ -83,15 +83,10 @@ def knn_validate(model, trainloader, validationloader, k=200):
         #votes[:, ytrain[ind[u, :]]] += torch.exp(tmp/0.2)
         #for idx in range(x.shape[0]):
           #votes[idx, ytrain[ind[u,idx]]] += torch.exp(val[u,idx]/0.2)
-        #print(thing.shape)
         #v = thing[ind[u, :]]
         #v = val[u]
-        #print(val[u].shape)
-        #print(v.shape)
-        #print(v)
         #votes[:,ytrain[ind[u]]] += torch.exp(v/0.2)
         #votes[:,ytrain[ind[u]]] += torch.exp(v)
-        #die()
       #knn_pred = torch.argmax(votes, dim=1)
 
       knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=False, dim=0).indices], dim=0)
@@ -100,7 +95,6 @@ def knn_validate(model, trainloader, validationloader, k=200):
       total += x.shape[0]
 
   print('1NN accuracy: {}'.format(correct/total))
-  die()
 
   model.train()
 
@@ -176,7 +170,6 @@ def main(datasetname, runname):
   n_iter = 0
   for epoch in range(n_epochs):
     print(f"epoch = {epoch}, smooth loss = {smooth_loss}")
-    knn_acc = knn_validate(model, trainloader, validationloader)
     for i, batch in enumerate(trainloader, 0):
       x, _ = batch
       
