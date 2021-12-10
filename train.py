@@ -124,7 +124,7 @@ def main(datasetname, runname):
     model = SimSiam(encoder=models.resnet18)
 
     # As described in the paper, blur wasn't used for CIFAR10 experiments
-    augmentations, augs_text = get_augmentations(blur=False)
+    augmentations, augs_text = get_augmentations(blur=False, imgsize=32)
     transform = transforms.ToTensor() 
 
     dataset_config = {
