@@ -14,8 +14,6 @@ import wandb
 import argparse
 import datetime
 
-import math
-
 def get_augmentations(imgsize=64, crop=True, flip=True, jitter=True, grayscale=True, blur=True):
   augs = []
   augs_text = ''
@@ -72,18 +70,37 @@ def knn_validate(model, trainloader, validationloader, k=200):
       z = F.normalize(model.get_embedding(x), dim=1)
 
       dist = torch.cdist(xtrain, z, p=2)
-      thing = torch.matmul(xtrain, z.T)
+      #dist = torch.norm(xtrain-z, p=2)
+      #thing = torch.matmul(xtrain, z.T)/0.2
+      #thing = torch.matmul(xtrain, z.T)
+      #dist = F.log_softmax(thing, dim=0)
 
-      val, ind = thing.topk(k, largest=True, dim=0)
-      for u in range(k):
-        for idx in range(x.shape[0]):
-          votes[idx, ytrain[ind[u,idx]]] += torch.exp(val[u,idx]/0.2)
-      knn_pred = torch.argmax(votes, dim=1)
+      #knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=False, dim=0).indices], dim=0)
+      #val, ind = thing.topk(k, largest=True, dim=0)
+      #print(val.shape)
+      #for u in range(k):
+        #tmp = val[u, :]
+        #votes[:, ytrain[ind[u, :]]] += torch.exp(tmp/0.2)
+        #for idx in range(x.shape[0]):
+          #votes[idx, ytrain[ind[u,idx]]] += torch.exp(val[u,idx]/0.2)
+        #print(thing.shape)
+        #v = thing[ind[u, :]]
+        #v = val[u]
+        #print(val[u].shape)
+        #print(v.shape)
+        #print(v)
+        #votes[:,ytrain[ind[u]]] += torch.exp(v/0.2)
+        #votes[:,ytrain[ind[u]]] += torch.exp(v)
+        #die()
+      #knn_pred = torch.argmax(votes, dim=1)
 
+      knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=False, dim=0).indices], dim=0)
+      #knn_pred = ytrain[dist.topk(k, largest=False, dim=0).indices][0]
       correct += torch.sum(knn_pred == y).item()
       total += x.shape[0]
 
   print('1NN accuracy: {}'.format(correct/total))
+  die()
 
   model.train()
 
@@ -107,13 +124,13 @@ def main(datasetname, runname):
   n_epochs = 100
 
   augs_text = ''
-  batch_size = 512
+  batch_size = 513
   if datasetname == 'CIFAR10':
     n_epochs = 100
     model = SimSiam(encoder=models.resnet18)
 
     # As described in the paper, blur wasn't used for CIFAR10 experiments
-    augmentations, augs_text = get_augmentations(blur=False, imgsize=32)
+    augmentations, augs_text = get_augmentations(blur=False)
     transform = transforms.ToTensor() 
 
     dataset_config = {
@@ -159,7 +176,7 @@ def main(datasetname, runname):
   n_iter = 0
   for epoch in range(n_epochs):
     print(f"epoch = {epoch}, smooth loss = {smooth_loss}")
-    adjust_learning_rate(optimizer, 0.03, epoch, n_epochs)
+    knn_acc = knn_validate(model, trainloader, validationloader)
     for i, batch in enumerate(trainloader, 0):
       x, _ = batch
       
