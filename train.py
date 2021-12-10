@@ -14,6 +14,8 @@ import wandb
 import argparse
 import datetime
 
+import math
+
 def get_augmentations(imgsize=64, crop=True, flip=True, jitter=True, grayscale=True, blur=True):
   augs = []
   augs_text = ''
@@ -25,7 +27,7 @@ def get_augmentations(imgsize=64, crop=True, flip=True, jitter=True, grayscale=T
     augs.append(transforms.RandomHorizontalFlip())
     augs_text += 'flip,'
   if jitter:
-    augs.append(transforms.RandomApply([transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.2)], p=0.8))
+    augs.append(transforms.RandomApply([transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1)], p=0.8))
     augs_text += 'jitter,'
   if grayscale:
     augs.append(transforms.RandomGrayscale(p=0.2))
@@ -69,20 +71,15 @@ def knn_validate(model, trainloader, validationloader, k=200):
 
       z = F.normalize(model.get_embedding(x), dim=1)
 
-      #dist = torch.cdist(xtrain, z, p=2)
-      #dist = torch.norm(xtrain-z, p=2)
-      #thing = torch.matmul(xtrain, z.T)/0.2
+      dist = torch.cdist(xtrain, z, p=2)
       thing = torch.matmul(xtrain, z.T)
-      #dist = F.log_softmax(thing, dim=0)
 
-      #knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=False, dim=0).indices], dim=0)
       val, ind = thing.topk(k, largest=True, dim=0)
       for u in range(k):
-        votes[:,ytrain[ind[u]]] += torch.exp(thing[ind[u]]/0.2)
+        for idx in range(x.shape[0]):
+          votes[idx, ytrain[ind[u,idx]]] += torch.exp(val[u,idx]/0.2)
       knn_pred = torch.argmax(votes, dim=1)
 
-      #knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=True, dim=0).indices], dim=0)
-      #knn_pred = ytrain[dist.topk(k, largest=False, dim=0).indices][0]
       correct += torch.sum(knn_pred == y).item()
       total += x.shape[0]
 
@@ -116,7 +113,7 @@ def main(datasetname, runname):
     model = SimSiam(encoder=models.resnet18)
 
     # As described in the paper, blur wasn't used for CIFAR10 experiments
-    augmentations, augs_text = get_augmentations(blur=False)
+    augmentations, augs_text = get_augmentations(blur=False, imgsize=32)
     transform = transforms.ToTensor() 
 
     dataset_config = {
@@ -162,6 +159,7 @@ def main(datasetname, runname):
   n_iter = 0
   for epoch in range(n_epochs):
     print(f"epoch = {epoch}, smooth loss = {smooth_loss}")
+    adjust_learning_rate(optimizer, 0.03, epoch, n_epochs)
     for i, batch in enumerate(trainloader, 0):
       x, _ = batch
       
@@ -192,6 +190,17 @@ def main(datasetname, runname):
     if datasetname == 'CIFAR10':
       knn_acc = knn_validate(model, trainloader, validationloader)
       wandb.log({'n_iter': n_iter, 'epoch': epoch, '1nn_accuracy': knn_acc})
+
+def adjust_learning_rate(optimizer, init_lr, epoch, n_epochs):
+    """Decay the learning rate based on schedule"""
+    cur_lr = init_lr * 0.5 * (1. + math.cos(math.pi * epoch / n_epochs))
+    for param_group in optimizer.param_groups:
+        if 'fix_lr' in param_group and param_group['fix_lr']:
+            param_group['lr'] = init_lr
+        else:
+            param_group['lr'] = cur_lr
+
+
 
 if __name__ == '__main__':
   # TODO Maybe add argparse stuff here
