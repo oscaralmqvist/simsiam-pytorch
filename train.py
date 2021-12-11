@@ -92,13 +92,13 @@ def get_weight_decay(optimizer):
     return p['weight_decay']
 
 
-def main(datasetname, runname):
+def main(args):
   print("using cuda?",torch.cuda.is_available())
   n_epochs = 100
 
   augs_text = ''
   batch_size = 512 
-  if datasetname == 'CIFAR10':
+  if args.dataset == 'CIFAR10':
     n_epochs = 800
     model = SimSiam(encoder=models.resnet18)
 
@@ -128,7 +128,7 @@ def main(datasetname, runname):
     optimizer = optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=0.0005)
     #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_epochs)
 
-  if datasetname == 'COCO': # COCO2017
+  if args.dataset == 'COCO': # COCO2017
     n_epochs = 1 
     model = SimSiam(encoder=models.resnet50)
 
@@ -147,7 +147,7 @@ def main(datasetname, runname):
       'pin_memory': torch.cuda.is_available()
     }
 
-    trainset = COCODataset(train=True, **dataset_config) 
+    trainset = COCODataset(train=False, **dataset_config) 
     trainloader = torch.utils.data.DataLoader(trainset, **dataloader_config)
 
     optimizer = optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=0.0005)
@@ -157,7 +157,7 @@ def main(datasetname, runname):
     model = model.to('cuda')
 
   config = {
-    'dataset': datasetname,
+    'dataset': args.dataset,
     'n_epochs': n_epochs,
     'optimizer': type(optimizer),
     'lr': get_lr(optimizer),
@@ -166,7 +166,8 @@ def main(datasetname, runname):
     'batch_size': dataloader_config['batch_size'],
     'augmentations': augs_text
   }
-  wandb.init(project='simsiam', entity='simsiambois', save_code=True, group='simsiambois', tags=datasetname, name=runname, config=config)
+
+  wandb.init(project='simsiam', entity='simsiambois', save_code=True, group='simsiambois', tags=args.dataset, name=args.name, config=config)
 
   wandb.watch(model)
 
@@ -176,7 +177,7 @@ def main(datasetname, runname):
     print(f"epoch = {epoch}, smooth loss = {smooth_loss}")
     for i, batch in enumerate(trainloader, 0):
 
-      if datasetname == 'CIFAR10':
+      if args.dataset == 'CIFAR10':
         x, _ = batch
       else:
         x = batch
@@ -205,12 +206,13 @@ def main(datasetname, runname):
       if i % 100 == 0 and i != 0:
         print('ITER: {}, loss: {}, smooth_loss: {}'.format(n_iter, lossval, smooth_loss))
 
-    if datasetname == 'CIFAR10':
+    if args.dataset == 'CIFAR10':
       knn_acc = knn_validate(model, trainloader, validationloader)
       wandb.log({'n_iter': n_iter, 'epoch': epoch, '1nn_accuracy': knn_acc})
     
-  print("Saving model...")
-  torch.save({'state_dict': model.state_dict()}, f"{runname}-ckpt.pth.tar")
+    if args.should_save:
+      print("Saving model...")
+      torch.save({'state_dict': model.state_dict()}, f"{args.name}-ckpt-epoch-{epoch}.pth.tar")
   
 
 if __name__ == '__main__':
@@ -219,12 +221,14 @@ if __name__ == '__main__':
                       help='what dataset to run (default: CIFAR10)')
   parser.add_argument('--name', '-n', dest='name', required=True,
                       help='name of the training run')
+  parser.add_argument('--save', '-s', dest='should_save',
+                      help='if we should save the model each epoch')
                       
   args = parser.parse_args()
 
   datasets = ['CIFAR10', 'COCO']
 
   if args.dataset in datasets:
-    main(args.dataset, args.name)
+    main(args)
   else:
     print(f'supported datasets: {datasets}')
