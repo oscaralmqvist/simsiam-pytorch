@@ -1,7 +1,8 @@
+# Taken from https://github.com/facebookresearch/moco/blob/main/detection/configs/pascal_voc_R_50_C4_24k.yaml
 _BASE_: "Base-RCNN-C4-BN.yaml"
 MODEL:
   MASK_ON: False
-  WEIGHTS: "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
+  WEIGHTS: ""
   ROI_HEADS:
     NUM_CLASSES: 20
 INPUT:

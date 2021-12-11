@@ -1,3 +1,6 @@
+# Taken from https://github.com/facebookresearch/moco/blob/main/detection/configs/Base-RCNN-C4-BN.yaml
+# Changes: use BN instead of SyncBN for MODEL.RESNET.NORM as we're running on a single gpu. 
+#          Also, smaller SOLVER.IMS_PER_BATCH due to memory constraints
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
   RPN:
@@ -8,10 +11,10 @@ MODEL:
   BACKBONE:
     FREEZE_AT: 0
   RESNETS:
-    NORM: "SyncBN"
+    NORM: "BN"
 TEST:
   PRECISE_BN:
     ENABLED: True
 SOLVER:
-  IMS_PER_BATCH: 16
+  IMS_PER_BATCH: 1
   BASE_LR: 0.02
