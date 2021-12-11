@@ -24,7 +24,7 @@ def get_augmentations(imgsize=64, crop=True, flip=True, jitter=True, grayscale=T
     augs_text += 'crop,'
   if flip:
     # NOTE The original paper did not specify probability of flip, so we use the default 0.5
-    augs.append(transforms.RandomHorizontalFlip())
+    augs.append(transforms.RandomHorizontalFlip(p=0.5))
     augs_text += 'flip,'
   if jitter:
     augs.append(transforms.RandomApply([transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1)], p=0.8))
