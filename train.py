@@ -173,6 +173,7 @@ def main(datasetname, runname):
   n_iter = 0
   for epoch in range(n_epochs):
     print(f"epoch = {epoch}, smooth loss = {smooth_loss}")
+    adjust_learning_rate(optimizer, 0.03, epoch, n_epochs)
     for i, batch in enumerate(trainloader, 0):
       x, _ = batch
       
