@@ -118,9 +118,9 @@ def main(datasetname, runname):
   n_epochs = 100
 
   augs_text = ''
-  batch_size = 513
+  batch_size = 512
   if datasetname == 'CIFAR10':
-    n_epochs = 100
+    n_epochs = 800
     model = SimSiam(encoder=models.resnet18)
 
     # As described in the paper, blur wasn't used for CIFAR10 experiments
