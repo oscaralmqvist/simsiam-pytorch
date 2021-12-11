@@ -14,6 +14,8 @@ import wandb
 import argparse
 import datetime
 
+import math
+
 def get_augmentations(imgsize=64, crop=True, flip=True, jitter=True, grayscale=True, blur=True):
   augs = []
   augs_text = ''
