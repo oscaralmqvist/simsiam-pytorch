@@ -133,7 +133,7 @@ def main(args):
     model = SimSiam(encoder=models.resnet50)
 
     augmentations, augs_text = get_augmentations()
-    transform = transforms.Compose([transforms.RandomCrop(128, pad_if_needed=True), transforms.ToTensor()]) 
+    transform = transforms.Compose([transforms.CenterCrop(128), transforms.ToTensor()]) 
 
     dataset_config = {
       'root': './datasets/coco/',
