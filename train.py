@@ -125,7 +125,10 @@ def main(datasetname, runname):
 
     # As described in the paper, blur wasn't used for CIFAR10 experiments
     augmentations, augs_text = get_augmentations(blur=False, imgsize=32)
-    transform = transforms.ToTensor() 
+    transform = transforms.Compose([
+                        transforms.ToTensor(),
+                        transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])])
+                        
 
     dataset_config = {
       'root': './data/CIFAR10/',
