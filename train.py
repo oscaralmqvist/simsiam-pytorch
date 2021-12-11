@@ -136,7 +136,7 @@ def main(datasetname, runname):
     transform = transforms.Compose([transforms.RandomCrop(128, pad_if_needed=True), transforms.ToTensor()]) 
 
     dataset_config = {
-      'root': './data/coco/',
+      'root': './datasets/coco/',
       'transform': transform
     }
 
