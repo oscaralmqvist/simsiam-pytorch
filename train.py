@@ -211,8 +211,8 @@ def main(args):
       wandb.log({'n_iter': n_iter, 'epoch': epoch, '1nn_accuracy': knn_acc})
     
     if args.should_save:
-      print("Saving model...")
-      torch.save({'state_dict': model.state_dict()}, f"{args.name}-ckpt-epoch-{epoch}.pth.tar")
+      print('Saving model...')
+      torch.save({'state_dict': model.state_dict()}, f'{args.name}-ckpt-epoch-{epoch+1}.pth.tar')
   
 
 if __name__ == '__main__':
@@ -221,7 +221,7 @@ if __name__ == '__main__':
                       help='what dataset to run (default: CIFAR10)')
   parser.add_argument('--name', '-n', dest='name', required=True,
                       help='name of the training run')
-  parser.add_argument('--save', '-s', dest='should_save',
+  parser.add_argument('--save', '-s', dest='should_save', default=False, action='store_true',
                       help='if we should save the model each epoch')
                       
   args = parser.parse_args()
