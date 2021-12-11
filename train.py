@@ -1,4 +1,5 @@
 import torch
+import argparse
 import torchvision
 import torchvision.transforms as transforms
 import torchvision.models as models
@@ -8,6 +9,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 from simsiam import SimSiam
+from coco_dataset import COCODataset
 
 import wandb
 
@@ -95,7 +97,7 @@ def main(datasetname, runname):
   n_epochs = 100
 
   augs_text = ''
-  batch_size = 512
+  batch_size = 512 
   if datasetname == 'CIFAR10':
     n_epochs = 800
     model = SimSiam(encoder=models.resnet18)
@@ -126,6 +128,34 @@ def main(datasetname, runname):
     optimizer = optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=0.0005)
     #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_epochs)
 
+  if datasetname == 'COCO': # COCO2017
+    n_epochs = 1 
+    model = SimSiam(encoder=models.resnet50)
+
+    augmentations, augs_text = get_augmentations()
+    transform = transforms.Compose([transforms.RandomCrop(128, pad_if_needed=True), transforms.ToTensor()]) 
+
+    dataset_config = {
+      'root': './data/coco/',
+      'transform': transform
+    }
+
+    dataloader_config = {
+      'batch_size': batch_size, # either resize all images or 1 as batch size...
+      'shuffle': True,
+      'num_workers': 4,
+      'pin_memory': torch.cuda.is_available()
+    }
+
+    trainset = COCODataset(train=True, **dataset_config) 
+    validationset = COCODataset(train=False, **dataset_config) 
+
+    trainloader = torch.utils.data.DataLoader(trainset, **dataloader_config)
+    validationloader = torch.utils.data.DataLoader(validationset, **dataloader_config)
+
+    optimizer = optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=0.0005)
+    #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_epochs)
+
   if torch.cuda.is_available():
     model = model.to('cuda')
 
@@ -148,8 +178,12 @@ def main(datasetname, runname):
   for epoch in range(n_epochs):
     print(f"epoch = {epoch}, smooth loss = {smooth_loss}")
     for i, batch in enumerate(trainloader, 0):
-      x, _ = batch
-      
+
+      if datasetname == 'CIFAR10':
+        x, _ = batch
+      else:
+        x = batch
+
       if torch.cuda.is_available():
         x = x.to('cuda')
 
@@ -183,5 +217,17 @@ def main(datasetname, runname):
   
 
 if __name__ == '__main__':
-  # TODO Maybe add argparse stuff here
-  main('CIFAR10', 'CIFAR10-testrun')
+  parser = argparse.ArgumentParser('Train a SimSiam model')
+  parser.add_argument('--dataset', '-d', dest='dataset', required=True,
+                      help='what dataset to run (default: CIFAR10)')
+  parser.add_argument('--name', '-n', dest='name', required=True,
+                      help='name of the training run')
+                      
+  args = parser.parse_args()
+
+  datasets = ['CIFAR10', 'COCO']
+
+  if args.dataset in datasets:
+    main(args.dataset, args.name)
+  else:
+    print(f'supported datasets: {datasets}')
