@@ -177,6 +177,10 @@ def main(datasetname, runname):
     if datasetname == 'CIFAR10':
       knn_acc = knn_validate(model, trainloader, validationloader)
       wandb.log({'n_iter': n_iter, 'epoch': epoch, '1nn_accuracy': knn_acc})
+    
+  print("Saving model...")
+  torch.save({'state_dict': model.state_dict()}, f"{runname}-ckpt.pth.tar")
+  
 
 if __name__ == '__main__':
   # TODO Maybe add argparse stuff here
