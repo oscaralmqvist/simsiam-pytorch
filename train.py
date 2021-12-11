@@ -148,10 +148,7 @@ def main(datasetname, runname):
     }
 
     trainset = COCODataset(train=True, **dataset_config) 
-    validationset = COCODataset(train=False, **dataset_config) 
-
     trainloader = torch.utils.data.DataLoader(trainset, **dataloader_config)
-    validationloader = torch.utils.data.DataLoader(validationset, **dataloader_config)
 
     optimizer = optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=0.0005)
     #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_epochs)
