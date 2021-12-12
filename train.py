@@ -70,29 +70,7 @@ def knn_validate(model, trainloader, validationloader, k=200):
         votes = votes.to('cuda')
 
       z = F.normalize(model.get_embedding(x), dim=1)
-
-      dist = torch.cdist(xtrain, z, p=2)
-      #dist = torch.norm(xtrain-z, p=2)
-      #thing = torch.matmul(xtrain, z.T)/0.2
-      #thing = torch.matmul(xtrain, z.T)
-      #dist = F.log_softmax(thing, dim=0)
-
-      #knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=False, dim=0).indices], dim=0)
-      #val, ind = thing.topk(k, largest=True, dim=0)
-      #print(val.shape)
-      #for u in range(k):
-        #tmp = val[u, :]
-        #votes[:, ytrain[ind[u, :]]] += torch.exp(tmp/0.2)
-        #for idx in range(x.shape[0]):
-          #votes[idx, ytrain[ind[u,idx]]] += torch.exp(val[u,idx]/0.2)
-        #v = thing[ind[u, :]]
-        #v = val[u]
-        #votes[:,ytrain[ind[u]]] += torch.exp(v/0.2)
-        #votes[:,ytrain[ind[u]]] += torch.exp(v)
-      #knn_pred = torch.argmax(votes, dim=1)
-
-      knn_pred, _ = torch.mode(ytrain[dist.topk(k, largest=False, dim=0).indices], dim=0)
-      #knn_pred = ytrain[dist.topk(k, largest=False, dim=0).indices][0]
+      knn_pred = knn_predict(z, xtrain.T, ytrain, 10, k, 0.2)
       correct += torch.sum(knn_pred == y).item()
       total += x.shape[0]
 
@@ -101,6 +79,30 @@ def knn_validate(model, trainloader, validationloader, k=200):
   model.train()
 
   return correct/total
+
+# Code taken from https://colab.research.google.com/github/facebookresearch/moco/blob/colab-notebook/colab/moco_cifar10_demo.ipynb
+# knn monitor as in InstDisc https://arxiv.org/abs/1805.01978
+# implementation follows http://github.com/zhirongw/lemniscate.pytorch and https://github.com/leftthomas/SimCLR
+def knn_predict(feature, feature_bank, feature_labels, classes, knn_k, knn_t):
+    # compute cos similarity between each feature vector and feature bank ---> [B, N]
+    sim_matrix = torch.mm(feature, feature_bank)
+    # [B, K]
+    sim_weight, sim_indices = sim_matrix.topk(k=knn_k, dim=-1)
+    # [B, K]
+    sim_labels = torch.gather(feature_labels.expand(feature.size(0), -1), dim=-1, index=sim_indices)
+    sim_weight = (sim_weight / knn_t).exp()
+
+    # counts for each class
+    one_hot_label = torch.zeros(feature.size(0) * knn_k, classes, device=sim_labels.device)
+    # [B*K, C]
+    one_hot_label = one_hot_label.scatter(dim=-1, index=sim_labels.view(-1, 1), value=1.0)
+    # weighted score ---> [B, C]
+    pred_scores = torch.sum(one_hot_label.view(feature.size(0), -1, classes) * sim_weight.unsqueeze(dim=-1), dim=1)
+
+    #pred_labels = pred_scores.argsort(dim=-1, descending=True)
+    pred_labels = pred_scores.argmax(dim=-1)
+
+    return pred_labels
 
 def get_lr(optimizer):
   for p in optimizer.param_groups:
@@ -127,9 +129,7 @@ def main(datasetname, runname):
 
     # As described in the paper, blur wasn't used for CIFAR10 experiments
     augmentations, augs_text = get_augmentations(blur=False, imgsize=32)
-    transform = transforms.Compose([
-                        transforms.ToTensor(),
-                        transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])])
+    transform = transforms.ToTensor()
                         
 
     dataset_config = {
@@ -146,9 +146,9 @@ def main(datasetname, runname):
     }
 
     trainset = torchvision.datasets.CIFAR10(train=True, **dataset_config)
-    validationset = torchvision.datasets.CIFAR10(train=False, **dataset_config)
-
     trainloader = torch.utils.data.DataLoader(trainset, **dataloader_config)
+
+    validationset = torchvision.datasets.CIFAR10(train=False, **dataset_config)
     validationloader = torch.utils.data.DataLoader(validationset, **dataloader_config)
 
     optimizer = optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=0.0005)
@@ -175,6 +175,7 @@ def main(datasetname, runname):
   n_iter = 0
   for epoch in range(n_epochs):
     print(f"epoch = {epoch}, smooth loss = {smooth_loss}")
+    #knn_acc = knn_validate(model, trainloader, validationloader)
     adjust_learning_rate(optimizer, 0.03, epoch, n_epochs)
     for i, batch in enumerate(trainloader, 0):
       x, _ = batch
