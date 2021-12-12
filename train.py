@@ -43,6 +43,7 @@ def get_augmentations(imgsize=64, crop=True, flip=True, jitter=True, grayscale=T
 
 def linear_evaluate(model, trainloader, validationloader):
   linear = nn.Linear(2048, 10)
+  linear.to('cuda')
   eval_loss = nn.CrossEntropyLoss()
   opt = optim.SGD(linear.parameters(), lr=30.0, momentum=0.9, weight_decay=0.0005)
   for ep in range(90):
