@@ -33,8 +33,11 @@ class SimSiam(nn.Module):
                           )
 
   def get_embedding(self, x):
+    x = self.embeddings(x).squeeze()
+    return self.projection(x)
+
     #return self.encoder(x).squeeze()
-    return self.embeddings(x).squeeze()
+    #return self.embeddings(x).squeeze()
 
   def forward(self, x1, x2):
     x1 = self.embeddings(x1).squeeze()
