@@ -67,6 +67,7 @@ def linear_evaluate(model, trainloader, validationloader):
         total += x.shape[0]
 
   print('lin eval done: acc: {}'.format(correct/total))
+  return correct/total
 
 def knn_validate(model, trainloader, validationloader, k=200):
   print('KNN')
@@ -237,7 +238,8 @@ def main(datasetname, runname):
       knn_acc = knn_validate(model, trainloader, validationloader)
       wandb.log({'n_iter': n_iter, 'epoch': epoch, '1nn_accuracy': knn_acc})
       if epoch % 100 == 0:
-        linear_evaluate(model, trainloader, validationloader)
+        res = linear_evaluate(model, trainloader, validationloader)
+        wandb.log({'n_iter': n_iter, 'linear_eval_acc': res})
 
 def adjust_learning_rate(optimizer, init_lr, epoch, n_epochs):
     """Decay the learning rate based on schedule"""
