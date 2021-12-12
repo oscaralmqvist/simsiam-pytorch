@@ -6,6 +6,7 @@ import torchvision.models as models
 import torch.optim as optim
 
 import torch.nn.functional as F
+import torch.nn as nn
 
 from simsiam import SimSiam
 
@@ -39,6 +40,33 @@ def get_augmentations(imgsize=64, crop=True, flip=True, jitter=True, grayscale=T
     augs_text += 'blur,'
 
   return transforms.Compose(augs), augs_text
+
+def linear_evaluate(model, trainloader, validationloader):
+  linear = nn.Linear(2048, 10)
+  eval_loss = nn.CrossEntropyLoss()
+  opt = optim.SGD(linear.parameters(), lr=30.0, momentum=0.9, weight_decay=0.0005)
+  for ep in range(90):
+    for i, batch in enumerate(trainloader, 0):
+        x, y = batch
+        with torch.no_grad():
+          z = model.get_embedding(x)
+        yhat = linear(z)
+        loss = eval_loss(yhat, y)
+        loss.backward()
+        opt.step()
+        opt.zero_grad()
+
+  correct = 0
+  total = 0
+  with torch.no_grad():
+    for i, batch in enumerate(trainloader, 0):
+        x, y = batch
+        z = model.get_embedding(x)
+        yhat = torch.argmax(linear(z), dim=1)
+        correct += torch.sum(yhat == y).item()
+        total += x.shape[0]
+
+  print('lin eval done: acc: {}'.format(correct/total))
 
 def knn_validate(model, trainloader, validationloader, k=200):
   print('KNN')
@@ -176,6 +204,7 @@ def main(datasetname, runname):
   for epoch in range(n_epochs):
     print(f"epoch = {epoch}, smooth loss = {smooth_loss}")
     #knn_acc = knn_validate(model, trainloader, validationloader)
+    #linear_evaluate(model, trainloader, validationloader)
     adjust_learning_rate(optimizer, 0.03, epoch, n_epochs)
     for i, batch in enumerate(trainloader, 0):
       x, _ = batch
@@ -207,6 +236,8 @@ def main(datasetname, runname):
     if datasetname == 'CIFAR10':
       knn_acc = knn_validate(model, trainloader, validationloader)
       wandb.log({'n_iter': n_iter, 'epoch': epoch, '1nn_accuracy': knn_acc})
+      if epoch % 100 == 0:
+        linear_evaluate(model, trainloader, validationloader)
 
 def adjust_learning_rate(optimizer, init_lr, epoch, n_epochs):
     """Decay the learning rate based on schedule"""
