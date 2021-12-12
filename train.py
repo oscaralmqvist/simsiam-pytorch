@@ -48,6 +48,8 @@ def linear_evaluate(model, trainloader, validationloader):
   for ep in range(90):
     for i, batch in enumerate(trainloader, 0):
         x, y = batch
+        if torch.cuda.is_available():
+          x, y = x.to('cuda'), y.to('cuda')
         with torch.no_grad():
           z = model.get_embedding(x)
         yhat = linear(z)
@@ -61,6 +63,9 @@ def linear_evaluate(model, trainloader, validationloader):
   with torch.no_grad():
     for i, batch in enumerate(trainloader, 0):
         x, y = batch
+        if torch.cuda.is_available():
+          x, y = x.to('cuda'), y.to('cuda')
+
         z = model.get_embedding(x)
         yhat = torch.argmax(linear(z), dim=1)
         correct += torch.sum(yhat == y).item()
