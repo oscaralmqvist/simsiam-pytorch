@@ -41,9 +41,10 @@ def get_augmentations(imgsize=64, crop=True, flip=True, jitter=True, grayscale=T
 
   return transforms.Compose(augs), augs_text
 
-def linear_evaluate(model, trainloader, validationloader):
-  linear = nn.Linear(2048, 10)
-  linear.to('cuda')
+def linear_evaluate(model, trainloader, validationloader, n_classes=10):
+  linear = nn.Linear(2048, n_classes)
+  if torch.cuda.is_available():
+    linear.to('cuda')
   eval_loss = nn.CrossEntropyLoss()
   opt = optim.SGD(linear.parameters(), lr=30.0, momentum=0.9, weight_decay=0.0005)
   for ep in range(90):
@@ -75,7 +76,7 @@ def linear_evaluate(model, trainloader, validationloader):
   print('lin eval done: acc: {}'.format(correct/total))
   return correct/total
 
-def knn_validate(model, trainloader, validationloader, k=200):
+def knn_validate(model, trainloader, validationloader, k=200, n_classes=10):
   print('KNN')
   model.eval()
   xtrain = []
@@ -99,13 +100,8 @@ def knn_validate(model, trainloader, validationloader, k=200):
     for i, batch in enumerate(validationloader):
       x, y = batch
 
-      votes = torch.zeros(x.shape[0], 10) # TODO Fix to be th number of classes instead of 10
-      if torch.cuda.is_available():
-        x, y = x.to('cuda'), y.to('cuda')
-        votes = votes.to('cuda')
-
       z = F.normalize(model.get_embedding(x), dim=1)
-      knn_pred = knn_predict(z, xtrain.T, ytrain, 10, k, 0.2)
+      knn_pred = knn_predict(z, xtrain.T, ytrain, n_classes, k, 0.2)
       correct += torch.sum(knn_pred == y).item()
       total += x.shape[0]
 
@@ -158,8 +154,16 @@ def main(datasetname, runname):
 
   augs_text = ''
   batch_size = 512
-  if datasetname == 'CIFAR10':
-    n_epochs = 800
+  if datasetname == 'CIFAR10' or datasetname == 'CIFAR100':
+    if datasetname == 'CIFAR10':
+      n_classes = 10
+      n_epochs = 800
+      data_path = './data/CIFAR10/'
+    else:
+      n_classes = 100
+      n_epochs = 200
+      data_path= './data/CIFAR100/'
+
     model = SimSiam(encoder=models.resnet18)
 
     # As described in the paper, blur wasn't used for CIFAR10 experiments
@@ -168,7 +172,7 @@ def main(datasetname, runname):
                         
 
     dataset_config = {
-      'root': './data/CIFAR10/',
+      'root': data_path,
       'download': True,
       'transform': transform
     }
@@ -179,12 +183,19 @@ def main(datasetname, runname):
       'num_workers': 4,
       'pin_memory': torch.cuda.is_available()
     }
+    if datasetname == 'CIFAR10':
+      trainset = torchvision.datasets.CIFAR10(train=True, **dataset_config)
+      trainloader = torch.utils.data.DataLoader(trainset, **dataloader_config)
 
-    trainset = torchvision.datasets.CIFAR10(train=True, **dataset_config)
-    trainloader = torch.utils.data.DataLoader(trainset, **dataloader_config)
+      validationset = torchvision.datasets.CIFAR10(train=False, **dataset_config)
+      validationloader = torch.utils.data.DataLoader(validationset, **dataloader_config)
+    else:
+      trainset = torchvision.datasets.CIFAR100(train=True, **dataset_config)
+      trainloader = torch.utils.data.DataLoader(trainset, **dataloader_config)
 
-    validationset = torchvision.datasets.CIFAR10(train=False, **dataset_config)
-    validationloader = torch.utils.data.DataLoader(validationset, **dataloader_config)
+      validationset = torchvision.datasets.CIFAR100(train=False, **dataset_config)
+      validationloader = torch.utils.data.DataLoader(validationset, **dataloader_config)
+
 
     optimizer = optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=0.0005)
     #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_epochs)
@@ -210,8 +221,8 @@ def main(datasetname, runname):
   n_iter = 0
   for epoch in range(n_epochs):
     print(f"epoch = {epoch}, smooth loss = {smooth_loss}")
-    #knn_acc = knn_validate(model, trainloader, validationloader)
-    #linear_evaluate(model, trainloader, validationloader)
+    knn_acc = knn_validate(model, trainloader, validationloader, n_classes=n_classes)
+    linear_evaluate(model, trainloader, validationloader, n_classes=n_classes)
     adjust_learning_rate(optimizer, 0.03, epoch, n_epochs)
     for i, batch in enumerate(trainloader, 0):
       x, _ = batch
@@ -241,10 +252,10 @@ def main(datasetname, runname):
         print('ITER: {}, loss: {}, smooth_loss: {}'.format(n_iter, lossval, smooth_loss))
 
     if datasetname == 'CIFAR10':
-      knn_acc = knn_validate(model, trainloader, validationloader)
+      knn_acc = knn_validate(model, trainloader, validationloader, n_classes=n_classes)
       wandb.log({'n_iter': n_iter, 'epoch': epoch, '1nn_accuracy': knn_acc})
       if epoch % 100 == 0:
-        res = linear_evaluate(model, trainloader, validationloader)
+        res = linear_evaluate(model, trainloader, validationloader, n_classes=n_classes)
         wandb.log({'n_iter': n_iter, 'linear_eval_acc': res})
 
 def adjust_learning_rate(optimizer, init_lr, epoch, n_epochs):
@@ -260,4 +271,4 @@ def adjust_learning_rate(optimizer, init_lr, epoch, n_epochs):
 
 if __name__ == '__main__':
   # TODO Maybe add argparse stuff here
-  main('CIFAR10', 'CIFAR10-testrun')
+  main('CIFAR100', 'CIFAR100-testrun')
